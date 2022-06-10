@@ -9,7 +9,7 @@ fn main() {
     let term = Term::stdout();
     let mut exit = false;
     //move cursor inside the box
-    let len = 16usize;
+    let len = 24usize;
     term.clear_screen().unwrap();
     let mut field = game::Field::new(len);
     println!("Press SPACE to sweep, ENTER to flag, ESC to exit");

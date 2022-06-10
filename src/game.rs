@@ -1,5 +1,4 @@
 use rand::Rng;
-use std::iter;
 
 pub struct Field {
     cells: Vec<u8>,
@@ -78,11 +77,8 @@ impl Field {
     }
 
     fn mines_nearby(&self, x: usize, y: usize) -> usize {
-        neighbors(x, y, self.size).fold(0, |mut acc, (x, y)| {
-            if self.has_mine(x, y) {
-                acc += 1;
-            }
-            acc
+        neighbors(x, y, self.size).fold(0, | acc, (x, y)| {
+            if self.has_mine(x, y) { acc + 1 } else { acc }
         })
     }
     
