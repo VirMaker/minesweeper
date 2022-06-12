@@ -1,7 +1,7 @@
 use rand::Rng;
 
 pub struct Field {
-    cells: Vec<u8>,
+    cells: std::cell::RefCell<Vec<u8>>,
     pub size: usize,
 }
 
@@ -18,28 +18,27 @@ fn neighbors(x: usize, y: usize, size: usize) -> impl Iterator<Item = (usize, us
     })
 }
 
-impl Field {
+impl<'a> Field {
     pub fn new(size: usize) -> Field {
         let mut rng = rand::thread_rng();
         let len = size * size;
-        let mut field = Field {cells: vec![0; len], size};
+        let field = Field {cells: RefCell::new(vec![0; len]), size};
         let mut num_mines = 32;
-        while num_mines > 0 {
-            let ix = rng.gen_range(0..len);
-            if field.cells[ix] == 1 { continue; }
-            field.cells[ix] = 1;
-            num_mines -= 1;
+        {
+            let mut cells = field.cells.borrow_mut();
+            while num_mines > 0 {
+                let ix = rng.gen_range(0..len);
+                if cells[ix] == 1 { continue; }
+                cells[ix] = 1;
+                num_mines -= 1;
+            }
         }
         field
     }
 
     fn is_set(&self, x: usize, y: usize, nth_bit: usize) -> bool {
         //dbg!(x, y);
-        (self.cells[y * self.size + x] >> nth_bit & 1) != 0
-    }
-
-    fn as_mut(&mut self, x: usize, y: usize) -> &mut u8 {
-        &mut self.cells[y * self.size + x]
+        (self.cells.borrow()[y * self.size + x] >> nth_bit & 1) != 0
     }
 
     pub fn has_mine(&self, x: usize, y: usize) -> bool {
@@ -47,33 +46,36 @@ impl Field {
     }
     pub fn is_swept(&self, x: usize, y: usize) -> bool {
         self.is_set(x, y, 1)
-    }
-    pub fn is_flagged(&self, x: usize, y: usize) -> bool {
-        self.is_set(x,y, 2)
-    }
+    }    
 
     pub fn toggle_flag(&mut self, x: usize, y: usize) -> bool {
         if self.is_swept(x, y) { return false; }
-        *self.as_mut(x, y) ^= 1 << 2;
-        self.is_flagged(x, y)
+        let flag_bit = 0b10;
+        let ix = y * self.size + x;
+        let mut cells = self.cells.borrow_mut();
+        cells[ix] ^= flag_bit;
+        cells[ix] & flag_bit != 0
     }
 
-    pub fn sweep(&mut self, x: usize, y: usize) -> Option<Vec<Sweep>> {       
+    pub fn sweep(&'a self, x: usize, y: usize) -> Option<Box<dyn Iterator<Item = Sweep> + 'a>> {       
         if self.has_mine(x, y) {
             None
         } else {
-            let current = Sweep{ x, y, mines_nearby: self.mines_nearby(x, y) };
-            if self.is_swept(x, y) || current.mines_nearby > 0  {
-                Some(vec![current])
-            } else {
-                *self.as_mut(x, y) |= 1 << 1;
-                let mut result = vec![current];
-                for (x, y) in neighbors(x, y, self.size) {
-                    result.append(&mut self.sweep(x, y).unwrap());
-                };
-                Some(result)
-            }
+            Some(self.sweep_rec(x, y))
         }
+    }
+
+    fn sweep_rec(&'a self, x: usize, y: usize) -> Box<dyn Iterator<Item = Sweep> + 'a> {
+        let current = Sweep{ x, y, mines_nearby: self.mines_nearby(x, y) };
+        if self.is_swept(x, y) || current.mines_nearby > 0 { return Box::new(std::iter::once(current)); }
+        let size = self.size;
+        {
+            let mut cells = self.cells.borrow_mut();
+            cells[y * self.size + x] |= 1 << 1;
+        }        
+        Box::new(std::iter::once(current).chain(neighbors(x, y, size).flat_map(|(x, y)| {            
+            self.sweep_rec(x, y)
+        })))
     }
 
     fn mines_nearby(&self, x: usize, y: usize) -> usize {
