@@ -22,7 +22,7 @@ impl<'a> Field {
     pub fn new(size: usize) -> Field {
         let mut rng = rand::thread_rng();
         let len = size * size;
-        let field = Field {cells: RefCell::new(vec![0; len]), size};
+        let field = Field {cells: std::cell::RefCell::new(vec![0; len]), size};
         let mut num_mines = 32;
         {
             let mut cells = field.cells.borrow_mut();
