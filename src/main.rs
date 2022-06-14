@@ -72,7 +72,7 @@ fn draw_field(len: usize) {
 
 fn update_field(term: &Term, sweeps: impl Iterator<Item = Sweep>) {
     for sweep in sweeps {
-        term.move_cursor_to(sweep.x + 1, sweep.y + 2).unwrap();
+        term.move_cursor_to(sweep.x as usize + 1, sweep.y as usize + 2).unwrap();
         match sweep.mines_nearby {
             0 => print!(" "),
             _ => print!("{0}", sweep.mines_nearby)
